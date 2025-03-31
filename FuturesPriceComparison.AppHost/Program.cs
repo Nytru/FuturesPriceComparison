@@ -6,4 +6,6 @@ var inventoryDatabase = builder
 builder.AddProject<Projects.FuturesPriceComparison_PriceChecker>("PriceChecker")
     .WithReference(inventoryDatabase);
 
-await builder.Build().RunAsync();
+await using var application = builder.Build();
+
+await application.RunAsync();

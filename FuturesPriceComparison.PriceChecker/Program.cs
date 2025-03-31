@@ -1,15 +1,65 @@
-using FuturesPriceComparison.ServiceDefaults;
+using Dapper;
+using FuturesPriceComparison.PriceChecker.Extensions;
+using FuturesPriceComparison.PriceChecker.Interfaces;
+using FuturesPriceComparison.PriceChecker.Jobs;
+using FuturesPriceComparison.PriceChecker.Repositories;
+using FuturesPriceComparison.PriceChecker.Services;
+using Quartz;
+using Serilog;
+
+DefaultTypeMap.MatchNamesWithUnderscores = true;
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .WriteTo.File("log/log.log")
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Host.UseSerilog();
 // Add service defaults & Aspire client integrations.
-builder.AddServiceDefaults();
+// builder.AddServiceDefaults();
+builder.Configuration.AddAppSettings();
 
-// Add services to the container.
-builder.Services.AddProblemDetails();
+var services = builder.Services;
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+services
+    .ConfigureByName<BinanceApiOptions>(builder.Configuration)
+    .AddHttpClient<IExchangeClient, BinanceClient>();
+
+services.AddNpgsqlDataSource("Host=localhost;Port=5432;Database=futures;Username=postgres;Password=postgres;");
+services.AddScoped<PostgresRepository>();
+
+services.AddScoped<PriceCheckerJob>();
+services.AddScoped<PriceCheckerService>();
+
+services.AddProblemDetails();
+services.AddControllers();
+
+services.AddOpenApi();
+services.AddQuartz(q =>
+{
+    // q.ScheduleJob<ConsoleWriterJob>(configurator => configurator
+    //     .WithSimpleSchedule(x => x
+    //         .WithIntervalInSeconds(3)
+    //         .RepeatForever()));
+
+    // var priceCheckerJobKey =  new JobKey("PriceCheckerJob");
+    // q.AddJob<PriceCheckerJob>(opts => opts.WithIdentity(priceCheckerJobKey));
+    // q.AddTrigger(opts => opts
+    //     .ForJob(priceCheckerJobKey)
+    //     .WithIdentity("PriceCheckerJob")
+    //     .WithSimpleSchedule(x => x
+    //         .WithIntervalInHours(1)
+    //         .RepeatForever()));
+
+    q.ScheduleJob<PriceCheckerJob>(configurator => configurator
+        .WithSimpleSchedule(x => x
+            .WithIntervalInMinutes(1)
+            .RepeatForever()));
+});
+services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
 
 var app = builder.Build();
 
@@ -23,29 +73,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.MapControllers();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-    {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast");
-
-app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+await app.RunAsync();
