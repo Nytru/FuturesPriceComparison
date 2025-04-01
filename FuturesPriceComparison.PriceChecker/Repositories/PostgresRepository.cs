@@ -1,20 +1,14 @@
 using Dapper;
+using FuturesPriceComparison.Models.ServiceModels;
 using Npgsql;
 
 namespace FuturesPriceComparison.PriceChecker.Repositories;
 
-public class PostgresRepository
+public class PostgresRepository(NpgsqlDataSource postgresDataSource)
 {
-    private readonly NpgsqlDataSource _postgresDataSource;
-
-    public PostgresRepository(NpgsqlDataSource  postgresDataSource)
+    public async Task<IEnumerable<PairToCheck>> GetPairsToCheck(string exchangeName, CancellationToken cancellationToken = default)
     {
-        _postgresDataSource = postgresDataSource;
-    }
-
-    public async Task<IEnumerable<PairToCheck>> GetPairsToCheck(CancellationToken cancellationToken = default)
-    {
-        await using var connection = _postgresDataSource.CreateConnection();
+        await using var connection = postgresDataSource.CreateConnection();
         const string selectPairsCommand = """
                                           select f.id as first_id,
                                                  f.name as first_name,
@@ -25,17 +19,19 @@ public class PostgresRepository
                                           from futures_pairs_to_check p
                                           join futures f on f.id = p.first_futures
                                           join futures f2 on f2.id = p.second_futures
-                                          where f.symbol != ''
-                                            and f2.symbol != '';
+                                          join exchanges e1 on e1.id = f.exchange_id
+                                          join exchanges e2 on e2.id = f2.exchange_id
+                                          where f.symbol != '' and e1.name = @exchange_name
+                                            and f2.symbol != '' and e2.name = @exchange_name;
                                           """;
-        var commandDefinition = new CommandDefinition(selectPairsCommand, cancellationToken: cancellationToken);
+        var commandDefinition = new CommandDefinition(selectPairsCommand, new {exchange_name = exchangeName}, cancellationToken: cancellationToken);
         var result = await connection.QueryAsync<PairToCheck>(commandDefinition);
         return result;
     }
 
-    public async Task<LastFuturesPrice> GetLastAvailablePrice(int firmId)
+    public async Task<LastFuturesPrice> GetLastAvailablePrice(int firmId, CancellationToken cancellationToken = default)
     {
-        await using var connection = _postgresDataSource.CreateConnection();
+        await using var connection = postgresDataSource.CreateConnection();
         const string selectPairsCommand = """
                                           select f.price,
                                                  f.timestamp_utc
@@ -45,46 +41,41 @@ public class PostgresRepository
                                           limit 1;
                                           """;
 
-        var commandDefinition = new CommandDefinition(selectPairsCommand, new { firmId });
+        var commandDefinition = new CommandDefinition(selectPairsCommand, new { firmId }, cancellationToken: cancellationToken);
         var result = await connection.QuerySingleAsync<LastFuturesPrice>(commandDefinition);
         return result;
     }
 
-    public async Task SaveNewPrice(int futuresId, decimal price, DateTime timestamp)
+    public async Task SaveNewPrice(int futuresId, decimal price, DateTime timestamp, CancellationToken cancellationToken = default)
     {
-        await using var connection = _postgresDataSource.CreateConnection();
+        await using var connection = postgresDataSource.CreateConnection();
         const string command = """
                                insert into futures_prices(price, timestamp_utc, futures_id)
                                values (@price, @timestamp, @id);
                                """;
-        var commandDefinition = new CommandDefinition(command, new { price, timestamp, id = futuresId });
+        var param = new { price, timestamp, id = futuresId };
+        var commandDefinition = new CommandDefinition(command, param, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(commandDefinition);
     }
 
-    public async Task SaveDifference(int firstFuturesId, int secondFuturesId, decimal difference, DateTime timestampUtc)
+    public async Task SaveDifference(int firstFuturesId, int secondFuturesId, decimal difference, DateTime timestampUtc, CancellationToken cancellationToken = default)
     {
-        await using var connection = _postgresDataSource.CreateConnection();
+        await using var connection = postgresDataSource.CreateConnection();
         const string command = """
                                insert into price_difference(first_futures, second_futures, difference, timestamp)
                                values (@first, @second, @difference, @timestamp);
                                """;
-        var commandDefinition = new CommandDefinition(command, new
+        var param = new
         {
             first = firstFuturesId,
             second = secondFuturesId,
             difference,
             timestamp = timestampUtc
-        });
+        };
+        var commandDefinition = new CommandDefinition(
+            command,
+            param,
+            cancellationToken: cancellationToken);
         await connection.ExecuteAsync(commandDefinition);
     }
 }
-
-public record PairToCheck(
-    int FirstId,
-    string FirstName,
-    string FirstSymbol,
-    int  SecondId,
-    string SecondName,
-    string SecondSymbol);
-
-public record LastFuturesPrice(decimal Price, DateTime TimestampUtc);

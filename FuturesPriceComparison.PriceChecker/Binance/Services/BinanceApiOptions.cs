@@ -1,4 +1,4 @@
-namespace FuturesPriceComparison.PriceChecker.Services;
+namespace FuturesPriceComparison.PriceChecker.Binance.Services;
 
 public class BinanceApiOptions
 {

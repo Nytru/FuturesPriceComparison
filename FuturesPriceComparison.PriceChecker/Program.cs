@@ -1,9 +1,14 @@
 using Dapper;
+using FuturesPriceComparison.PriceChecker.Binance.Jobs;
+using FuturesPriceComparison.PriceChecker.Binance.Repository;
+using FuturesPriceComparison.PriceChecker.Binance.Services;
+using FuturesPriceComparison.PriceChecker.Constants;
 using FuturesPriceComparison.PriceChecker.Extensions;
 using FuturesPriceComparison.PriceChecker.Interfaces;
-using FuturesPriceComparison.PriceChecker.Jobs;
 using FuturesPriceComparison.PriceChecker.Repositories;
 using FuturesPriceComparison.PriceChecker.Services;
+using Polly;
+using Polly.Retry;
 using Quartz;
 using Serilog;
 
@@ -26,34 +31,31 @@ var services = builder.Services;
 
 services
     .ConfigureByName<BinanceApiOptions>(builder.Configuration)
-    .AddHttpClient<IExchangeClient, BinanceClient>();
+    .AddHttpClient<IExchangeClient, BinanceClient>()
+    .AddTransientHttpErrorPolicy(policy =>
+    {
+        return policy.WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+    });
 
 services.AddNpgsqlDataSource("Host=localhost;Port=5432;Database=futures;Username=postgres;Password=postgres;");
+services.AddSingleton<IDateTmeProvider, DateTmeProvider>();
 services.AddScoped<PostgresRepository>();
-
+services.AddScoped<BinancePostgresRepository>();
+services.AddResiliencePipeline(PoliciesNames.PostgresPolicy, b =>
+{
+    b.AddRetry(new RetryStrategyOptions
+    {
+        ShouldHandle = new PredicateBuilder()
+            .Handle<Exception>(),
+        Delay = TimeSpan.FromSeconds(1),
+        MaxRetryAttempts = 3
+    });
+});
 services.AddScoped<PriceCheckerJob>();
-services.AddScoped<PriceCheckerService>();
-
 services.AddProblemDetails();
-services.AddControllers();
-
 services.AddOpenApi();
 services.AddQuartz(q =>
 {
-    // q.ScheduleJob<ConsoleWriterJob>(configurator => configurator
-    //     .WithSimpleSchedule(x => x
-    //         .WithIntervalInSeconds(3)
-    //         .RepeatForever()));
-
-    // var priceCheckerJobKey =  new JobKey("PriceCheckerJob");
-    // q.AddJob<PriceCheckerJob>(opts => opts.WithIdentity(priceCheckerJobKey));
-    // q.AddTrigger(opts => opts
-    //     .ForJob(priceCheckerJobKey)
-    //     .WithIdentity("PriceCheckerJob")
-    //     .WithSimpleSchedule(x => x
-    //         .WithIntervalInHours(1)
-    //         .RepeatForever()));
-
     q.ScheduleJob<PriceCheckerJob>(configurator => configurator
         .WithSimpleSchedule(x => x
             .WithIntervalInMinutes(1)
@@ -73,6 +75,5 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.MapControllers();
 
 await app.RunAsync();
