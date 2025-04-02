@@ -7,7 +7,6 @@ using FuturesPriceComparison.PriceChecker.Constants;
 using FuturesPriceComparison.PriceChecker.Exceptions;
 using FuturesPriceComparison.PriceChecker.Repositories;
 using FuturesPriceComparison.PriceChecker.Utilities;
-using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Retry;
 using Quartz;
@@ -63,7 +62,7 @@ services.AddQuartz(q =>
         .GetSection(nameof(ScheduleOptions))
         .GetValue<int?>(nameof(ScheduleOptions.IntervalInSeconds));
     if (interval is null)
-        throw new MissingConfigException("Section SampleOptions is missing");
+        throw new MissingConfigException($"Section {nameof(ScheduleOptions)} is missing");
 
     q.ScheduleJob<PriceCheckerJob>(configurator => configurator
         .WithSimpleSchedule(x => x
