@@ -1,4 +1,4 @@
-create table exchanges
+create table if not exists  exchanges
 (
     id   serial
         constraint exchanges_pk
@@ -6,10 +6,10 @@ create table exchanges
     name text not null
 );
 
-alter table exchanges
+alter table if exists exchanges
     owner to postgres;
 
-create table futures
+create table if not exists  futures
 (
     id          serial
         constraint futures_pk
@@ -22,10 +22,10 @@ create table futures
     pair        varchar(100) default ''::character varying not null
 );
 
-alter table futures
+alter table if exists futures
     owner to postgres;
 
-create table futures_prices
+create table if not exists  futures_prices
 (
     price         numeric                  not null,
     timestamp_utc timestamp with time zone not null,
@@ -37,10 +37,10 @@ create table futures_prices
             primary key
 );
 
-alter table futures_prices
+alter table if exists futures_prices
     owner to postgres;
 
-create table price_difference
+create table if not exists  price_difference
 (
     id             serial
         constraint price_difference_pk
@@ -55,10 +55,10 @@ create table price_difference
     timestamp      timestamp with time zone not null
 );
 
-alter table price_difference
+alter table if exists price_difference
     owner to postgres;
 
-create table futures_pairs_to_check
+create table if not exists futures_pairs_to_check
 (
     first_futures  integer not null
         constraint pairs_to_check_futures_id_fk
@@ -70,6 +70,5 @@ create table futures_pairs_to_check
         primary key (first_futures, second_futures)
 );
 
-alter table futures_pairs_to_check
+alter table if exists futures_pairs_to_check
     owner to postgres;
-

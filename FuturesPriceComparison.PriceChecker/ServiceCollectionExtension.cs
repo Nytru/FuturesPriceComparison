@@ -1,4 +1,6 @@
+using FluentMigrator.Runner;
 using FuturesPriceComparison.PriceChecker.Exceptions;
+using FuturesPriceComparison.PriceChecker.Migrations;
 
 namespace FuturesPriceComparison.PriceChecker;
 
@@ -17,6 +19,18 @@ public static class ServiceCollectionExtension
         if (value is null)
             throw new MissingConfigException($"{envName} env is missing");
 
-        return services.AddNpgsqlDataSource(value);
+        return services
+            .AddNpgsqlDataSource(value)
+            .AddMigrations(configuration, envName);
     }
+
+    private static IServiceCollection AddMigrations(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string envName) => services
+        .AddFluentMigratorCore()
+        .ConfigureRunner(rb => rb
+            .AddPostgres()
+            .WithGlobalConnectionString(configuration.GetValue<string>(envName))
+            .ScanIn(typeof(InitialMigration).Assembly).For.Migrations());
 }

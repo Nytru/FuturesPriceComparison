@@ -1,10 +1,12 @@
 using Dapper;
+using FluentMigrator.Runner;
 using FuturesPriceComparison.PriceChecker;
 using FuturesPriceComparison.PriceChecker.Binance.Jobs;
 using FuturesPriceComparison.PriceChecker.Binance.Repository;
 using FuturesPriceComparison.PriceChecker.Binance.Services;
 using FuturesPriceComparison.PriceChecker.Constants;
 using FuturesPriceComparison.PriceChecker.Exceptions;
+using FuturesPriceComparison.PriceChecker.Migrations;
 using FuturesPriceComparison.PriceChecker.Repositories;
 using FuturesPriceComparison.PriceChecker.Utilities;
 using Polly;
@@ -78,5 +80,11 @@ var app = builder.Build();
 app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
+
+using (var scope = app.Services.CreateScope())
+{
+    var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
+    runner.MigrateUp();
+}
 
 await app.RunAsync();
