@@ -1,17 +1,17 @@
-using FuturesPriceComparison.Models.ServiceModels;
+using System.Data.Common;
+using FuturesPriceComparison.PriceChecker.Binance.Models.ServiceModels;
 using FuturesPriceComparison.PriceChecker.Constants;
 using FuturesPriceComparison.PriceChecker.Repositories;
-using Npgsql;
 using Polly;
 
 namespace FuturesPriceComparison.PriceChecker.Binance.Repository;
 
-public sealed class BinancePostgresRepository(
-    [FromKeyedServices(PoliciesNames.PostgresPolicy)]
+public sealed class BinanceRepository(
+    [FromKeyedServices(PoliciesNames.DbPolicy)]
     ResiliencePipeline retryPolicy,
     PostgresRepository postgresRepository)
 {
-    public async Task<NpgsqlTransaction> CreateTransaction(CancellationToken cancellationToken = default)
+    public async Task<DbTransaction> CreateTransaction(CancellationToken cancellationToken = default)
     {
         return await postgresRepository.BeginTransactionAsync(cancellationToken);
     }
@@ -36,7 +36,7 @@ public sealed class BinancePostgresRepository(
         int futuresId,
         decimal price,
         DateTime timestamp,
-        NpgsqlTransaction? transaction = null,
+        DbTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
         await retryPolicy.ExecuteAsync(async ct =>
@@ -54,7 +54,7 @@ public sealed class BinancePostgresRepository(
         int secondFuturesId,
         decimal difference,
         DateTime timestampUtc,
-        NpgsqlTransaction? transaction = null,
+        DbTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
         await retryPolicy.ExecuteAsync(async ct =>

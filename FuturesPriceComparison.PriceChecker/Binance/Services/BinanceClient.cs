@@ -1,5 +1,5 @@
-using FuturesPriceComparison.Models.ServiceModels;
-using FuturesPriceComparison.PriceChecker.Interfaces;
+using FuturesPriceComparison.PriceChecker.Binance.Models.ServiceModels;
+using FuturesPriceComparison.PriceChecker.Utilities;
 using Microsoft.Extensions.Options;
 
 namespace FuturesPriceComparison.PriceChecker.Binance.Services;

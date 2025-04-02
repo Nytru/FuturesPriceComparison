@@ -1,14 +1,18 @@
+using System.Data;
+using System.Data.Common;
 using Dapper;
-using FuturesPriceComparison.Models.ServiceModels;
+using FuturesPriceComparison.PriceChecker.Binance.Models.ServiceModels;
 using Npgsql;
 
 namespace FuturesPriceComparison.PriceChecker.Repositories;
 
 public class PostgresRepository(NpgsqlConnection connection)
 {
-    public async Task<NpgsqlTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+    public async Task<DbTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
     {
-        await connection.OpenAsync(cancellationToken);
+        if (connection.State == ConnectionState.Closed)
+            await connection.OpenAsync(cancellationToken);
+
         return await connection.BeginTransactionAsync(cancellationToken);
     }
 
@@ -39,20 +43,20 @@ public class PostgresRepository(NpgsqlConnection connection)
         return result;
     }
 
-    public async Task<LastFuturesPrice> GetLastAvailablePrice(int firmId, CancellationToken cancellationToken = default)
+    public async Task<LastFuturesPrice> GetLastAvailablePrice(int futuresId, CancellationToken cancellationToken = default)
     {
         const string selectPairsCommand = """
                                           select f.price,
                                                  f.timestamp_utc
                                           from futures_prices f
-                                          where f.futures_id = @firmId
+                                          where f.futures_id = @id
                                           order by f.timestamp_utc desc
                                           limit 1;
                                           """;
 
         var commandDefinition = new CommandDefinition(
             selectPairsCommand,
-            new { firmId },
+            new { id = futuresId },
             cancellationToken: cancellationToken);
         var result = await connection.QuerySingleAsync<LastFuturesPrice>(commandDefinition);
         return result;
@@ -62,7 +66,7 @@ public class PostgresRepository(NpgsqlConnection connection)
         int futuresId,
         decimal price,
         DateTime timestamp,
-        NpgsqlTransaction? transaction = null,
+        DbTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
         const string command = """
@@ -83,7 +87,7 @@ public class PostgresRepository(NpgsqlConnection connection)
         int secondFuturesId,
         decimal difference,
         DateTime timestampUtc,
-        NpgsqlTransaction? transaction = null,
+        DbTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
         const string command = """

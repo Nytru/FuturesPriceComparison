@@ -1,12 +1,13 @@
 using Dapper;
+using FuturesPriceComparison.PriceChecker;
 using FuturesPriceComparison.PriceChecker.Binance.Jobs;
 using FuturesPriceComparison.PriceChecker.Binance.Repository;
 using FuturesPriceComparison.PriceChecker.Binance.Services;
 using FuturesPriceComparison.PriceChecker.Constants;
-using FuturesPriceComparison.PriceChecker.Extensions;
-using FuturesPriceComparison.PriceChecker.Interfaces;
+using FuturesPriceComparison.PriceChecker.Exceptions;
 using FuturesPriceComparison.PriceChecker.Repositories;
-using FuturesPriceComparison.PriceChecker.Services;
+using FuturesPriceComparison.PriceChecker.Utilities;
+using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Retry;
 using Quartz;
@@ -23,10 +24,7 @@ Log.Logger = new LoggerConfiguration()
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
-// Add service defaults & Aspire client integrations.
-// builder.AddServiceDefaults();
 builder.Configuration.AddAppSettings();
-
 
 var services = builder.Services;
 
@@ -42,10 +40,10 @@ services
     });
 
 services.AddNpgsql(builder.Configuration);
-services.AddSingleton<IDateTmeProvider, DateTmeProvider>();
+services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 services.AddScoped<PostgresRepository>();
-services.AddScoped<BinancePostgresRepository>();
-services.AddResiliencePipeline(PoliciesNames.PostgresPolicy, b =>
+services.AddScoped<BinanceRepository>();
+services.AddResiliencePipeline(PoliciesNames.DbPolicy, b =>
 {
     b.AddRetry(new RetryStrategyOptions
     {
@@ -57,26 +55,28 @@ services.AddResiliencePipeline(PoliciesNames.PostgresPolicy, b =>
 });
 services.AddScoped<PriceCheckerJob>();
 services.AddProblemDetails();
-services.AddOpenApi();
+services.ConfigureByName<ScheduleOptions>(builder.Configuration);
+
 services.AddQuartz(q =>
 {
+    var interval = builder.Configuration
+        .GetSection(nameof(ScheduleOptions))
+        .GetValue<int?>(nameof(ScheduleOptions.IntervalInSeconds));
+    if (interval is null)
+        throw new MissingConfigException("Section SampleOptions is missing");
+
     q.ScheduleJob<PriceCheckerJob>(configurator => configurator
         .WithSimpleSchedule(x => x
-            .WithIntervalInMinutes(1)
+            .WithIntervalInSeconds(interval.Value)
             .RepeatForever()));
 });
+
 services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
 
 app.UseHttpsRedirection();
 

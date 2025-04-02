@@ -1,6 +1,6 @@
 using FuturesPriceComparison.PriceChecker.Exceptions;
 
-namespace FuturesPriceComparison.PriceChecker.Extensions;
+namespace FuturesPriceComparison.PriceChecker;
 
 public static class ServiceCollectionExtension
 {

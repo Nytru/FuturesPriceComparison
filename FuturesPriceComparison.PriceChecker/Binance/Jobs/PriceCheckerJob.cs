@@ -1,47 +1,46 @@
-using FuturesPriceComparison.Models.ServiceModels;
+using FuturesPriceComparison.PriceChecker.Binance.Models.ServiceModels;
 using FuturesPriceComparison.PriceChecker.Binance.Repository;
-using FuturesPriceComparison.PriceChecker.Exceptions;
-using FuturesPriceComparison.PriceChecker.Interfaces;
-using Npgsql;
+using FuturesPriceComparison.PriceChecker.Utilities;
 using Quartz;
 
 namespace FuturesPriceComparison.PriceChecker.Binance.Jobs;
 
 [DisallowConcurrentExecution]
 public class PriceCheckerJob(
-    IDateTmeProvider dateTmeProvider,
+    IDateTimeProvider dateTimeProvider,
     IExchangeClient binanceClient,
-    BinancePostgresRepository binancePostgresRepository,
+    BinanceRepository binanceRepository,
     ILogger<PriceCheckerJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)
     {
         var cancellationToken = context.CancellationToken;
-        NpgsqlTransaction? transaction = null;
+
         try
         {
-            var pairs = await binancePostgresRepository.GetPairsToCheck(cancellationToken);
+            var pairs = await binanceRepository.GetPairsToCheck(cancellationToken);
             foreach (var pairToCheck in pairs)
             {
-                await using (transaction = await binancePostgresRepository.CreateTransaction(cancellationToken))
+                var transaction = await binanceRepository.CreateTransaction(cancellationToken);
+                try
                 {
                     var actualPrices = await GetActualPrices(pairToCheck);
                     var difference = actualPrices.FirstPrice - actualPrices.SecondPrice;
 
-                    await binancePostgresRepository.SaveNewPrice(
+                    await binanceRepository.SaveNewPrice(
                         actualPrices.FirstFuturesId,
                         actualPrices.FirstPrice,
                         actualPrices.TimeStamp,
                         transaction,
                         cancellationToken);
-                    await binancePostgresRepository.SaveNewPrice(
+                    await binanceRepository.SaveNewPrice(
                         actualPrices.SecondFuturesId,
                         actualPrices.SecondPrice,
                         actualPrices.TimeStamp,
                         transaction,
                         cancellationToken);
 
-                    await binancePostgresRepository.SaveDifference(
+                    await binanceRepository.SaveDifference(
                         actualPrices.FirstFuturesId,
                         actualPrices.SecondFuturesId,
                         difference,
@@ -50,51 +49,49 @@ public class PriceCheckerJob(
                         cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                 }
+                catch (Exception e)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    logger.LogError(e, "Error while trying check price");
+                }
+                finally
+                {
+                    await transaction.DisposeAsync();
+                }
             }
 
             logger.LogInformation("Price check job finished");
         }
         catch (Exception e)
         {
-            if (transaction != null)
-                await transaction.RollbackAsync(cancellationToken);
-            logger.LogError(e, "Error during checking price");
-        }
-        finally
-        {
-            if (transaction != null)
-                await transaction.DisposeAsync();
+            logger.LogError(e, "Error getting info to check");
         }
     }
 
     private async Task<ActualPrices> GetActualPrices(PairToCheck p)
     {
-        var firstPriceTask = binanceClient.GetPriceForActive(p.FirstSymbol);
-        var secondPriceTask = binanceClient.GetPriceForActive(p.SecondSymbol);
+        var firstPriceTask = PriceForActive(p.FirstSymbol, p.FirstId);
+        var secondPriceTask = PriceForActive(p.SecondSymbol, p.SecondId);
         await Task.WhenAll(firstPriceTask, secondPriceTask);
         var firstPrice = await firstPriceTask;
         var secondPrice = await secondPriceTask;
 
-        LastFuturesPrice? firstPriceDb = null;
-        if (firstPrice is null)
-        {
-            logger.LogError("Failed to get price for {symbol}", p.FirstSymbol);
-            firstPriceDb = await binancePostgresRepository.GetLastAvailablePrice(p.FirstId);
-        }
-
-        LastFuturesPrice? secondPriceDb = null;
-        if (secondPrice is null)
-        {
-            logger.LogError("Failed to get price for {symbol}", p.SecondSymbol);
-            secondPriceDb = await binancePostgresRepository.GetLastAvailablePrice(p.SecondId);
-        }
-
         return new ActualPrices(
             FirstFuturesId: p.FirstId,
             SecondFuturesId: p.SecondId,
-            FirstPrice: firstPrice?.Price ?? firstPriceDb?.Price ?? throw new NoAvailableInfoException(p.FirstName),
-            SecondPrice: secondPrice?.Price ?? secondPriceDb?.Price ?? throw new NoAvailableInfoException(p.SecondName),
-            TimeStamp: dateTmeProvider.TimestampUtc);
+            FirstPrice: firstPrice,
+            SecondPrice: secondPrice,
+            TimeStamp: dateTimeProvider.TimestampUtc);
+    }
+
+    private async Task<decimal> PriceForActive(string symbol, int futuresId)
+    {
+        var price = await binanceClient.GetPriceForActive(symbol);
+        if (price is not null)
+            return price.Price;
+
+        var dbPrice = await binanceRepository.GetLastAvailablePrice(futuresId);
+        return dbPrice.Price;
     }
 
     private record ActualPrices(

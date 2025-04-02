@@ -1,4 +1,4 @@
-namespace FuturesPriceComparison.PriceChecker.Extensions;
+namespace FuturesPriceComparison.PriceChecker;
 
 public static class ConfigurationBuilderExtension
 {

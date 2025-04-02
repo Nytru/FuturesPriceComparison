@@ -1,4 +1,4 @@
-namespace FuturesPriceComparison.Models.ServiceModels;
+namespace FuturesPriceComparison.PriceChecker.Binance.Models.ServiceModels;
 
 public record PairToCheck(
     int FirstId,

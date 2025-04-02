@@ -1,6 +1,6 @@
-using FuturesPriceComparison.Models.ServiceModels;
+using FuturesPriceComparison.PriceChecker.Binance.Models.ServiceModels;
 
-namespace FuturesPriceComparison.PriceChecker.Interfaces;
+namespace FuturesPriceComparison.PriceChecker.Utilities;
 
 public interface IExchangeClient
 {
