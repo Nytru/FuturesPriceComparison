@@ -1,15 +1,21 @@
 using FuturesPriceComparison.Models.ServiceModels;
 using FuturesPriceComparison.PriceChecker.Constants;
 using FuturesPriceComparison.PriceChecker.Repositories;
+using Npgsql;
 using Polly;
 
 namespace FuturesPriceComparison.PriceChecker.Binance.Repository;
 
-public class BinancePostgresRepository(
+public sealed class BinancePostgresRepository(
     [FromKeyedServices(PoliciesNames.PostgresPolicy)]
     ResiliencePipeline retryPolicy,
     PostgresRepository postgresRepository)
 {
+    public async Task<NpgsqlTransaction> CreateTransaction(CancellationToken cancellationToken = default)
+    {
+        return await postgresRepository.BeginTransactionAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<PairToCheck>> GetPairsToCheck(CancellationToken cancellationToken = default)
     {
         return await retryPolicy.ExecuteAsync(async ct =>
@@ -30,10 +36,16 @@ public class BinancePostgresRepository(
         int futuresId,
         decimal price,
         DateTime timestamp,
+        NpgsqlTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
         await retryPolicy.ExecuteAsync(async ct =>
-            await postgresRepository.SaveNewPrice(futuresId, price, timestamp, ct),
+            await postgresRepository.SaveNewPrice(
+                futuresId,
+                price,
+                timestamp,
+                transaction,
+                ct),
             cancellationToken);
     }
 
@@ -42,10 +54,17 @@ public class BinancePostgresRepository(
         int secondFuturesId,
         decimal difference,
         DateTime timestampUtc,
+        NpgsqlTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
         await retryPolicy.ExecuteAsync(async ct =>
-            await postgresRepository.SaveDifference(firstFuturesId, secondFuturesId, difference, timestampUtc, ct),
+            await postgresRepository.SaveDifference(
+                firstFuturesId,
+                secondFuturesId,
+                difference,
+                timestampUtc,
+                transaction,
+                ct),
             cancellationToken);
     }
 }

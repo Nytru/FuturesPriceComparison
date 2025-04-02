@@ -1,3 +1,4 @@
+using FuturesPriceComparison.Models.ServiceModels;
 using FuturesPriceComparison.PriceChecker.Interfaces;
 using Microsoft.Extensions.Options;
 
@@ -30,7 +31,7 @@ public class BinanceClient : IExchangeClient
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Failed to parse ticker");
+            _logger.LogError(e, "Failed to get price for active");
             return null;
         }
     }

@@ -1,0 +1,52 @@
+services:
+  price-checker:
+    build:
+      context: .
+      dockerfile: FuturesPriceComparison.PriceChecker/Dockerfile
+    ports:
+      - "5000:80"
+      - "5001:443"
+    depends_on:
+      - postgres
+    environment:
+      - ASPNETCORE_ENVIRONMENT=prod
+      - POSTGRES_CONNECTION_STRING=Host=localhost;Port=5432;Database=futures;Username=postgres;Password=postgres;
+
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: pricechecker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - prometheus_data:/etc/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - price-checker
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:

@@ -1,3 +1,5 @@
+using FuturesPriceComparison.Models.ServiceModels;
+
 namespace FuturesPriceComparison.PriceChecker.Interfaces;
 
 public interface IExchangeClient
@@ -6,5 +8,3 @@ public interface IExchangeClient
         string symbol,
         CancellationToken cancellationToken = default);
 }
-
-public record Ticker(decimal Price, string Symbol);

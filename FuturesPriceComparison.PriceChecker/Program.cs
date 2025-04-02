@@ -27,17 +27,21 @@ builder.Host.UseSerilog();
 // builder.AddServiceDefaults();
 builder.Configuration.AddAppSettings();
 
+
 var services = builder.Services;
+
+builder.Configuration.AddEnvironmentVariables();
 
 services
     .ConfigureByName<BinanceApiOptions>(builder.Configuration)
     .AddHttpClient<IExchangeClient, BinanceClient>()
     .AddTransientHttpErrorPolicy(policy =>
     {
-        return policy.WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+        return policy
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
     });
 
-services.AddNpgsqlDataSource("Host=localhost;Port=5432;Database=futures;Username=postgres;Password=postgres;");
+services.AddNpgsql(builder.Configuration);
 services.AddSingleton<IDateTmeProvider, DateTmeProvider>();
 services.AddScoped<PostgresRepository>();
 services.AddScoped<BinancePostgresRepository>();
