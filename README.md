@@ -7,9 +7,10 @@
 `docker compose up -d` (Создает приложение, Prometheus, Grafana)  
 
 
-Grafana dashboards: http://localhost:3000/dashboards  
+Grafana dashboard: http://localhost:3000/dashboards  
 Login: `Admin`  
-Password: `Admin`
+Password: `Admin`  
+Содержит базовые метрики ресурсов сервиса.
 
 ---
 
@@ -22,6 +23,7 @@ Password: `Admin`
 Разница хранится в коллекции `price_difference`, цены хранятся в коллекции `futures_prices`.  
 
 Выбор фьючерсов для парсинга возможен добавлением интересующих фьючерсов в коллекцию `futures` и их `id` в `futures_pairs_to_check`  
+Для удобной демонстрации вместе с миграцией инициализации применяется миграция, добавляющая данные о `BTCUSDT-Q` и `BTCUSDT-BI-Q`
 
 Инервал опроса настраивается в файле `appsettings.json`.
 
