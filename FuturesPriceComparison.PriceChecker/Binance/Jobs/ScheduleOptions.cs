@@ -2,5 +2,5 @@ namespace FuturesPriceComparison.PriceChecker.Binance.Jobs;
 
 public class ScheduleOptions
 {
-    public required int IntervalInSeconds { get; init; }
+    public required TimeSpan Interval { get; init; }
 }

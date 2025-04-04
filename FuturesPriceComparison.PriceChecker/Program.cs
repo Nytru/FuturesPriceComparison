@@ -62,13 +62,13 @@ services.AddQuartz(q =>
 {
     var interval = builder.Configuration
         .GetSection(nameof(ScheduleOptions))
-        .GetValue<int?>(nameof(ScheduleOptions.IntervalInSeconds));
+        .GetValue<TimeSpan?>(nameof(ScheduleOptions.Interval));
     if (interval is null)
         throw new MissingConfigException($"Section {nameof(ScheduleOptions)} is missing");
 
     q.ScheduleJob<PriceCheckerJob>(configurator => configurator
         .WithSimpleSchedule(x => x
-            .WithIntervalInSeconds(interval.Value)
+            .WithInterval(interval.Value)
             .RepeatForever()));
 });
 services.AddMetrics();
