@@ -7,9 +7,10 @@
 `docker compose up -d` (Создает приложение, Prometheus, Grafana)  
 
 
-Grafana dashboards: http://localhost:3000/dashboards  
+Grafana dashboard: http://localhost:3000/dashboards  
 Login: `Admin`  
-Password: `Admin`
+Password: `Admin`  
+Содержит базовые метрики ресурсов сервиса.
 
 ---
 
