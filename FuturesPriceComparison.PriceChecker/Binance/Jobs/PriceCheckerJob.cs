@@ -52,7 +52,7 @@ public class PriceCheckerJob(
                 catch (Exception e)
                 {
                     await transaction.RollbackAsync(cancellationToken);
-                    logger.LogError(e, "Error while trying check price");
+                    logger.LogError(e, "Error while trying check price for {pair}", pairToCheck);
                 }
                 finally
                 {
