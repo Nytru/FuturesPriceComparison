@@ -32,5 +32,6 @@ public static class ServiceCollectionExtension
         .ConfigureRunner(rb => rb
             .AddPostgres()
             .WithGlobalConnectionString(configuration.GetValue<string>(envName))
-            .ScanIn(typeof(InitialMigration).Assembly).For.Migrations());
+            .ScanIn(typeof(InitialMigration).Assembly).For.Migrations()
+            .ScanIn(typeof(FillUpMigration).Assembly).For.Migrations());
 }

@@ -6,11 +6,11 @@ using FuturesPriceComparison.PriceChecker.Binance.Repository;
 using FuturesPriceComparison.PriceChecker.Binance.Services;
 using FuturesPriceComparison.PriceChecker.Constants;
 using FuturesPriceComparison.PriceChecker.Exceptions;
-using FuturesPriceComparison.PriceChecker.Migrations;
 using FuturesPriceComparison.PriceChecker.Repositories;
 using FuturesPriceComparison.PriceChecker.Utilities;
 using Polly;
 using Polly.Retry;
+using Prometheus;
 using Quartz;
 using Serilog;
 
@@ -71,7 +71,7 @@ services.AddQuartz(q =>
             .WithIntervalInSeconds(interval.Value)
             .RepeatForever()));
 });
-
+services.AddMetrics();
 services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
 
 var app = builder.Build();
@@ -86,5 +86,7 @@ using (var scope = app.Services.CreateScope())
     var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
     runner.MigrateUp();
 }
+
+app.MapMetrics();
 
 await app.RunAsync();
